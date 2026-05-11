@@ -1,0 +1,23 @@
+name: 每日客戶進度提醒
+
+on:
+  schedule:
+    - cron: "0 1 * * 1-5"   # 週一到週五早上 9:00 台灣時間 (UTC+8)
+  workflow_dispatch:          # 可手動觸發測試
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm install node-fetch
+      - name: 執行通知腳本
+        env:
+          LINE_MANAGER_TOKEN: ${{ secrets.LINE_MANAGER_TOKEN }}
+          GIST_ID: ${{ secrets.GIST_ID }}
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          STALE_DAYS: "1"
+        run: node notify.js
