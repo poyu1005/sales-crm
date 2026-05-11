@@ -16,8 +16,8 @@ jobs:
       - run: npm install node-fetch
       - name: 執行通知腳本
         env:
-          LINE_MANAGER_TOKEN: ${{ secrets.LINE_MANAGER_TOKEN }}
-          GIST_ID: ${{ secrets.GIST_ID }}
-          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
-          STALE_DAYS: "1"
-        run: node notify.js
+  LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
+  LINE_GROUP_ID:      ${{ secrets.LINE_GROUP_ID }}
+  GIST_ID:            ${{ secrets.GIST_ID }}
+  GIST_TOKEN:         ${{ secrets.GIST_TOKEN }}
+  STALE_DAYS:         "1"
