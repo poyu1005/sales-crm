@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>業務進度追蹤系統</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f7f6f3; --surface: #ffffff; --border: #e5e3de; --border-strong: #ccc9c0;
+    --text: #1a1916; --text-secondary: #6b6860; --text-hint: #a8a59e;
+    --accent: #2d6a4f; --accent-light: #e8f5ee; --accent-text: #1b4332;
+    --warn: #b45309; --warn-light: #fef3c7; --danger: #b91c1c; --danger-light: #fee2e2;
+    --info: #1d4ed8; --info-light: #dbeafe; --radius: 10px; --radius-sm: 6px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08); --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
+  }
+  body { font-family: 'Noto Sans TC', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; }
+  .topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; box-shadow: var(--shadow); }
+  .logo { font-size: 16px; font-weight: 600; color: var(--accent); }
+  .logo span { color: var(--text-secondary); font-weight: 400; margin-left: 6px; font-size: 13px; }
+  .topbar-right { display: flex; align-items: center; gap: 12px; }
+  .user-badge { background: var(--accent-light); color: var(--accent-text); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+  .btn-sm { padding: 6px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); cursor: pointer; font-size: 13px; font-family: inherit; transition: background 0.15s; }
+  .btn-sm:hover { background: var(--bg); }
+  .btn-primary { background: var(--accent); color: white; border-color: var(--accent); }
+  .btn-primary:hover { background: var(--accent-text); }
+  .main { max-width: 1100px; margin: 0 auto; padding: 24px 20px; }
+  #loginScreen { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); }
+  .login-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 40px; width: 340px; box-shadow: var(--shadow-md); }
+  .login-card h2 { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+  .login-card p { color: var(--text-secondary); font-size: 13px; margin-bottom: 28px; }
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .field input, .field select, .field textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font-family: inherit; font-size: 14px; background: var(--surface); color: var(--text); outline: none; transition: border-color 0.15s; }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
+  .field textarea { resize: vertical; min-height: 80px; }
+  .btn-block { width: 100%; padding: 11px; background: var(--accent); color: white; border: none; border-radius: var(--radius-sm); font-size: 14px; font-weight: 500; cursor: pointer; font-family: inherit; margin-top: 8px; }
+  .btn-block:hover { background: var(--accent-text); }
+  .login-roles { display: flex; gap: 8px; margin-bottom: 20px; }
+  .role-btn { flex: 1; padding: 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); cursor: pointer; font-size: 13px; font-family: inherit; text-align: center; transition: all 0.15s; color: var(--text-secondary); }
+  .role-btn.active { border-color: var(--accent); background: var(--accent-light); color: var(--accent-text); font-weight: 500; }
+  .tabs { display: flex; gap: 2px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
+  .tab { padding: 10px 18px; cursor: pointer; font-size: 14px; color: var(--text-secondary); border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s; font-family: inherit; background: none; border-top: none; border-left: none; border-right: none; }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 500; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); }
+  .stat-label { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .stat-num { font-size: 26px; font-weight: 600; }
+  .stat-num.warn { color: var(--warn); } .stat-num.danger { color: var(--danger); } .stat-num.accent { color: var(--accent); }
+  .toolbar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+  .toolbar input, .toolbar select { padding: 8px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font-family: inherit; font-size: 13px; background: var(--surface); color: var(--text); outline: none; }
+  .toolbar input { width: 200px; }
+  .toolbar-right { margin-left: auto; }
+  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+  table { width: 100%; border-collapse: collapse; }
+  th { background: var(--bg); padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--bg); }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 500; white-space: nowrap; }
+  .badge-報價中 { background: var(--warn-light); color: var(--warn); }
+  .badge-等待回覆 { background: #f3e8ff; color: #6d28d9; }
+  .badge-已成交 { background: var(--accent-light); color: var(--accent-text); }
+  .badge-未成交 { background: var(--danger-light); color: var(--danger); }
+  .badge-暫緩 { background: #f1f5f9; color: #475569; }
+  .badge-約訪 { background: var(--info-light); color: var(--info); }
+  .badge-試洗 { background: #fce7f3; color: #9d174d; }
+  .badge-提需求給設計 { background: #ecfdf5; color: #065f46; }
+  .stale-row td { background: #fff8f0; }
+  .stale-row:hover td { background: #fff3e0; }
+  .stale-badge { display: inline-block; background: var(--danger-light); color: var(--danger); font-size: 10px; padding: 2px 7px; border-radius: 10px; margin-left: 6px; font-weight: 500; }
+  .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 200; align-items: center; justify-content: center; }
+  .modal-bg.open { display: flex; }
+  .modal { background: var(--surface); border-radius: var(--radius); width: 500px; max-width: 95vw; max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow-md); }
+  .modal-header { padding: 20px 24px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .modal-header h3 { font-size: 16px; font-weight: 600; }
+  .modal-close { background: none; border: none; cursor: pointer; font-size: 20px; color: var(--text-secondary); line-height: 1; }
+  .modal-body { padding: 20px 24px; }
+  .modal-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .empty { text-align: center; padding: 48px 24px; color: var(--text-secondary); }
+  .empty-icon { font-size: 36px; margin-bottom: 12px; }
+  .setup-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); margin-bottom: 16px; }
+  .setup-card h3 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+  .setup-card p { font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.7; }
+  .sales-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; margin-bottom: 24px; }
+  .sales-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); }
+  .sales-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .sales-name { font-weight: 600; font-size: 15px; }
+  .sales-stats { display: flex; gap: 10px; }
+  .sales-stat { text-align: center; }
+  .sales-stat-num { font-size: 20px; font-weight: 600; }
+  .sales-stat-num.warn { color: var(--warn); }
+  .sales-stat-label { font-size: 10px; color: var(--text-secondary); }
+  .action-row { display: flex; gap: 6px; }
+  .icon-btn { padding: 5px 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); cursor: pointer; font-size: 12px; color: var(--text-secondary); transition: all 0.15s; font-family: inherit; }
+  .icon-btn:hover { background: var(--bg); color: var(--text); }
+  .icon-btn.danger:hover { background: var(--danger-light); color: var(--danger); border-color: var(--danger); }
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--text); color: white; padding: 12px 20px; border-radius: var(--radius-sm); font-size: 13px; z-index: 999; opacity: 0; transform: translateY(8px); transition: all 0.25s; pointer-events: none; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.success { background: var(--accent); }
+  .toast.error { background: var(--danger); }
+  .loading-overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.8); z-index: 500; display: flex; align-items: center; justify-content: center; font-size: 15px; color: var(--text-secondary); }
+</style>
+</head>
+<body>
+
+<!-- Login -->
+<div id="loginScreen">
+  <div class="login-card">
+    <h2>業務進度追蹤</h2>
+    <p>請選擇身份並登入</p>
+    <div class="login-roles">
+      <button class="role-btn active" onclick="selectRole('sales')" id="roleSales">👤 業務</button>
+      <button class="role-btn" onclick="selectRole('manager')" id="roleManager">👔 主管</button>
+    </div>
+    <div class="field">
+      <label>姓名</label>
+      <select id="loginName"><option value="">載入中...</option></select>
+    </div>
+    <div class="field" id="managerPwField" style="display:none">
+      <label>主管密碼</label>
+      <input type="password" id="managerPw" placeholder="輸入密碼">
+    </div>
+    <button class="btn-block" onclick="doLogin()">進入系統</button>
+  </div>
+</div>
+
+<!-- App -->
+<div id="appScreen" style="display:none">
+  <div class="topbar">
+    <div class="logo">業務進度追蹤 <span id="topRole"></span></div>
+    <div class="topbar-right">
+      <span class="user-badge" id="topUser"></span>
+      <button class="btn-sm" onclick="doLogout()">登出</button>
+    </div>
+  </div>
+  <div class="main">
+    <!-- Sales View -->
+    <div id="salesView" style="display:none">
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('myClients',this)">我的客戶</button>
+        <button class="tab" onclick="switchTab('updateProgress',this)">更新進度</button>
+      </div>
+      <div class="tab-panel active" id="myClients">
+        <div class="stats" id="salesStats"></div>
+        <div class="toolbar">
+          <input type="text" placeholder="搜尋客戶名稱..." oninput="renderSalesTable()" id="salesSearch">
+          <select onchange="renderSalesTable()" id="salesStatusFilter">
+            <option value="">全部狀態</option>
+            <option>報價中</option><option>等待回覆</option><option>約訪</option>
+            <option>試洗</option><option>提需求給設計</option>
+            <option>已成交</option><option>未成交</option><option>暫緩</option>
+          </select>
+          <div class="toolbar-right"><button class="btn-sm btn-primary" onclick="openAddClient()">＋ 新增客戶</button></div>
+        </div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>客戶名稱</th><th>來源</th><th>機種</th><th>進度</th><th>最後更新</th><th>備註</th><th>操作</th></tr></thead>
+          <tbody id="salesTableBody"></tbody>
+        </table></div>
+      </div>
+      <div class="tab-panel" id="updateProgress">
+        <div class="setup-card">
+          <h3>快速更新進度</h3>
+          <p>選擇客戶，填寫最新進度，系統會自動記錄更新時間。</p>
+          <div class="field">
+            <label>選擇客戶</label>
+            <select id="updateClientSelect" onchange="loadClientForUpdate()"><option value="">請選擇客戶...</option></select>
+          </div>
+          <div id="updateForm" style="display:none">
+            <div class="form-row">
+              <div class="field"><label>進度狀態</label>
+                <select id="updateStatus">
+                  <option>報價中</option><option>等待回覆</option><option>約訪</option>
+                  <option>試洗</option><option>提需求給設計</option>
+                  <option>已成交</option><option>未成交</option><option>暫緩</option>
+                </select>
+              </div>
+              <div class="field"><label>機種</label><input type="text" id="updateModel" placeholder="例：Model A"></div>
+            </div>
+            <div class="field"><label>備註（本次更新說明）</label><textarea id="updateNote" placeholder="例：客戶表示需要再比較價格，下週跟進..."></textarea></div>
+            <button class="btn-block" onclick="submitUpdate()">✓ 確認更新</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Manager View -->
+    <div id="managerView" style="display:none">
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('allClients',this)">全部客戶</button>
+        <button class="tab" onclick="switchTab('salesOverview',this)">業務概況</button>
+        <button class="tab" onclick="switchTab('systemSettings',this)">系統設定</button>
+      </div>
+      <div class="tab-panel active" id="allClients">
+        <div class="stats" id="managerStats"></div>
+        <div class="toolbar">
+          <input type="text" placeholder="搜尋客戶..." oninput="renderManagerTable()" id="managerSearch">
+          <select onchange="renderManagerTable()" id="managerSalesFilter"><option value="">全部業務</option></select>
+          <select onchange="renderManagerTable()" id="managerStatusFilter">
+            <option value="">全部狀態</option>
+            <option>報價中</option><option>等待回覆</option><option>約訪</option>
+            <option>試洗</option><option>提需求給設計</option>
+            <option>已成交</option><option>未成交</option><option>暫緩</option>
+          </select>
+          <select onchange="renderManagerTable()" id="managerStaleFilter">
+            <option value="">全部</option><option value="stale">僅顯示未更新</option>
+          </select>
+          <div class="toolbar-right"><button class="btn-sm btn-primary" onclick="openAddClient()">＋ 新增客戶</button></div>
+        </div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>客戶名稱</th><th>負責業務</th><th>來源</th><th>機種</th><th>進度</th><th>最後更新</th><th>備註</th><th>操作</th></tr></thead>
+          <tbody id="managerTableBody"></tbody>
+        </table></div>
+      </div>
+      <div class="tab-panel" id="salesOverview">
+        <div class="sales-grid" id="salesGrid"></div>
+      </div>
+      <div class="tab-panel" id="systemSettings">
+        <div class="setup-card">
+          <h3>業務名單管理</h3>
+          <p>新增或刪除業務人員。業務登入時從此名單選擇姓名。</p>
+          <div id="salesMemberList" style="margin-bottom:14px"></div>
+          <div style="display:flex;gap:10px">
+            <div class="field" style="margin:0;flex:1"><input type="text" id="newSalesName" placeholder="輸入業務姓名..." style="width:100%"></div>
+            <button class="btn-sm btn-primary" onclick="addSalesMember()" style="white-space:nowrap">新增</button>
+          </div>
+        </div>
+        <div class="setup-card">
+          <h3>主管密碼</h3>
+          <p>主管登入需輸入此密碼（預設：1234）</p>
+          <div style="display:flex;gap:10px">
+            <div class="field" style="margin:0;flex:1"><input type="password" id="newManagerPw" placeholder="設定新密碼..." style="width:100%"></div>
+            <button class="btn-sm btn-primary" onclick="saveManagerPw()" style="white-space:nowrap">更新密碼</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-bg" id="clientModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modalTitle">新增客戶</h3>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="field"><label>客戶名稱 *</label><input type="text" id="fName" placeholder="公司或客戶名"></div>
+        <div class="field"><label>負責業務 *</label><select id="fSales"></select></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>客戶來源</label><input type="text" id="fSource" placeholder="例：展覽、介紹、廣告"></div>
+        <div class="field"><label>機種</label><input type="text" id="fModel" placeholder="例：Model A"></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>進度狀態</label>
+          <select id="fStatus">
+            <option>報價中</option><option>等待回覆</option><option>約訪</option>
+            <option>試洗</option><option>提需求給設計</option>
+            <option>已成交</option><option>未成交</option><option>暫緩</option>
+          </select>
+        </div>
+        <div class="field"><label>最後更新時間</label><input type="datetime-local" id="fUpdated"></div>
+      </div>
+      <div class="field"><label>備註</label><textarea id="fNote" placeholder="目前進展、下次跟進重點..."></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-sm" onclick="closeModal()">取消</button>
+      <button class="btn-sm btn-primary" onclick="saveClient()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── 設定 ──────────────────────────────────────────────────────────
+const API_URL = 'https://script.google.com/macros/s/AKfycbzyOWiORg17kKDNYwcsZ3HvZrk0fsvkANp4wPjCNNPyqahXfcRGm-BWw_drqMs9VacoQA/exec';
+const STALE_DAYS = 1;
+const STATUS_DONE = ['已成交', '未成交'];
+
+// ── 本機暫存 ──────────────────────────────────────────────────────
+let allClients = [];
+let salesMembers = [];
+let currentUser = null;
+let currentRole = null;
+let editingId = null;
+let selectedRole = 'sales';
+
+const DB = {
+  get: (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set: (k, v) => localStorage.setItem(k, JSON.stringify(v)),
+};
+const getManagerPw = () => DB.get('crm_mpw', '1234');
+const setManagerPw = p => DB.set('crm_mpw', p);
+
+// ── API ───────────────────────────────────────────────────────────
+async function apiGet(action) {
+  const res = await fetch(`${API_URL}?action=${action}`);
+  return res.json();
+}
+
+async function apiPost(data) {
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  return res.json();
+}
+
+function showLoading(msg = '載入中...') {
+  let el = document.getElementById('loadingOverlay');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'loadingOverlay';
+    el.className = 'loading-overlay';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.display = 'flex';
+}
+
+function hideLoading() {
+  const el = document.getElementById('loadingOverlay');
+  if (el) el.style.display = 'none';
+}
+
+// ── Utilities ─────────────────────────────────────────────────────
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+function daysSince(d) { if (!d) return 999; return Math.floor((Date.now() - new Date(d).getTime()) / 86400000); }
+function formatDate(d) { if (!d) return '—'; const dt = new Date(d); return `${dt.getMonth()+1}/${dt.getDate()} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`; }
+function nowISO() { return new Date().toISOString(); }
+function isStale(c) { return daysSince(c.updatedAt) >= STALE_DAYS && !STATUS_DONE.includes(c.status); }
+
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show ' + type;
+  setTimeout(() => t.className = 'toast', 2200);
+}
+
+// ── Login ─────────────────────────────────────────────────────────
+async function initLogin() {
+  showLoading('載入業務名單...');
+  try {
+    salesMembers = await apiGet('getSalesMembers');
+  } catch(e) {
+    salesMembers = [];
+  }
+  hideLoading();
+  populateLoginDropdown();
+}
+
+function selectRole(role) {
+  selectedRole = role;
+  document.getElementById('roleSales').className = 'role-btn' + (role === 'sales' ? ' active' : '');
+  document.getElementById('roleManager').className = 'role-btn' + (role === 'manager' ? ' active' : '');
+  document.getElementById('managerPwField').style.display = role === 'manager' ? 'block' : 'none';
+  populateLoginDropdown();
+}
+
+function populateLoginDropdown() {
+  const sel = document.getElementById('loginName');
+  sel.innerHTML = '<option value="">請選擇...</option>';
+  if (selectedRole === 'manager') {
+    sel.innerHTML += '<option value="主管">主管</option>';
+  } else {
+    salesMembers.forEach(m => sel.innerHTML += `<option>${m}</option>`);
+  }
+}
+
+async function doLogin() {
+  const name = document.getElementById('loginName').value;
+  if (!name) { showToast('請選擇姓名', 'error'); return; }
+  if (selectedRole === 'manager') {
+    if (document.getElementById('managerPw').value !== getManagerPw()) { showToast('密碼錯誤', 'error'); return; }
+  }
+  currentUser = name; currentRole = selectedRole;
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('appScreen').style.display = 'block';
+  document.getElementById('topUser').textContent = name;
+  document.getElementById('topRole').textContent = selectedRole === 'manager' ? '｜主管後台' : '｜業務';
+  await loadClients();
+  initView();
+}
+
+function doLogout() {
+  currentUser = null; currentRole = null; allClients = [];
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('appScreen').style.display = 'none';
+  document.getElementById('managerPw').value = '';
+}
+
+// ── Data ──────────────────────────────────────────────────────────
+async function loadClients() {
+  showLoading('載入客戶資料...');
+  try {
+    allClients = await apiGet('getClients');
+  } catch(e) {
+    allClients = [];
+    showToast('載入失敗，請重新整理', 'error');
+  }
+  hideLoading();
+}
+
+// ── View Init ─────────────────────────────────────────────────────
+function initView() {
+  if (currentRole === 'sales') {
+    document.getElementById('salesView').style.display = 'block';
+    document.getElementById('managerView').style.display = 'none';
+    renderSalesTable(); renderSalesStats(); populateUpdateSelect();
+  } else {
+    document.getElementById('salesView').style.display = 'none';
+    document.getElementById('managerView').style.display = 'block';
+    renderManagerTable(); renderManagerStats(); renderSalesOverview();
+    renderSalesMemberList(); populateManagerFilters();
+  }
+}
+
+function switchTab(id, el) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id)?.classList.add('active');
+  el?.classList.add('active');
+}
+
+// ── Sales View ────────────────────────────────────────────────────
+function renderSalesStats() {
+  const clients = allClients.filter(c => c.sales === currentUser);
+  const stale = clients.filter(isStale);
+  const won = clients.filter(c => c.status === '已成交');
+  document.getElementById('salesStats').innerHTML = `
+    <div class="stat-card"><div class="stat-label">我的客戶</div><div class="stat-num accent">${clients.length}</div></div>
+    <div class="stat-card"><div class="stat-label">未更新</div><div class="stat-num ${stale.length > 0 ? 'danger' : ''}">${stale.length}</div></div>
+    <div class="stat-card"><div class="stat-label">已成交</div><div class="stat-num">${won.length}</div></div>
+    <div class="stat-card"><div class="stat-label">進行中</div><div class="stat-num">${clients.filter(c => !STATUS_DONE.includes(c.status)).length}</div></div>
+  `;
+}
+
+function renderSalesTable() {
+  const search = document.getElementById('salesSearch')?.value.toLowerCase() || '';
+  const statusF = document.getElementById('salesStatusFilter')?.value || '';
+  let clients = allClients.filter(c => c.sales === currentUser);
+  if (search) clients = clients.filter(c => c.name?.toLowerCase().includes(search));
+  if (statusF) clients = clients.filter(c => c.status === statusF);
+  clients.sort((a, b) => (isStale(b) ? 1 : 0) - (isStale(a) ? 1 : 0));
+  const tbody = document.getElementById('salesTableBody');
+  if (!clients.length) { tbody.innerHTML = '<tr><td colspan="7"><div class="empty"><div class="empty-icon">📋</div><p>目前沒有客戶記錄</p></div></td></tr>'; return; }
+  tbody.innerHTML = clients.map(c => {
+    const stale = isStale(c); const days = daysSince(c.updatedAt);
+    return `<tr class="${stale ? 'stale-row' : ''}">
+      <td><strong>${c.name}</strong>${stale ? `<span class="stale-badge">⚠ ${days}天未更新</span>` : ''}</td>
+      <td>${c.source || '—'}</td><td>${c.model || '—'}</td>
+      <td><span class="badge badge-${c.status}">${c.status}</span></td>
+      <td>${formatDate(c.updatedAt)}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${c.note || ''}">${c.note || '—'}</td>
+      <td><div class="action-row">
+        <button class="icon-btn" onclick="openEditClient('${c.id}')">編輯</button>
+        <button class="icon-btn danger" onclick="deleteClient('${c.id}')">刪除</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+function populateUpdateSelect() {
+  const sel = document.getElementById('updateClientSelect');
+  const clients = allClients.filter(c => c.sales === currentUser && !STATUS_DONE.includes(c.status));
+  sel.innerHTML = '<option value="">請選擇客戶...</option>';
+  clients.forEach(c => sel.innerHTML += `<option value="${c.id}">${c.name}${isStale(c) ? ' ⚠' : ''}</option>`);
+}
+
+function loadClientForUpdate() {
+  const id = document.getElementById('updateClientSelect').value;
+  document.getElementById('updateForm').style.display = id ? 'block' : 'none';
+  if (!id) return;
+  const c = allClients.find(x => x.id === id);
+  if (c) { document.getElementById('updateStatus').value = c.status; document.getElementById('updateModel').value = c.model || ''; document.getElementById('updateNote').value = ''; }
+}
+
+async function submitUpdate() {
+  const id = document.getElementById('updateClientSelect').value;
+  if (!id) return;
+  const c = allClients.find(x => x.id === id);
+  if (!c) return;
+  const updated = { ...c, status: document.getElementById('updateStatus').value, model: document.getElementById('updateModel').value, note: document.getElementById('updateNote').value || c.note, updatedAt: nowISO() };
+  showLoading('更新中...');
+  await apiPost({ action: 'saveClient', client: updated });
+  hideLoading();
+  showToast('✓ 進度已更新！');
+  await loadClients();
+  renderSalesTable(); renderSalesStats(); populateUpdateSelect();
+  document.getElementById('updateClientSelect').value = '';
+  document.getElementById('updateForm').style.display = 'none';
+}
+
+// ── Manager View ──────────────────────────────────────────────────
+function populateManagerFilters() {
+  const sel = document.getElementById('managerSalesFilter');
+  sel.innerHTML = '<option value="">全部業務</option>';
+  salesMembers.forEach(m => sel.innerHTML += `<option>${m}</option>`);
+}
+
+function renderManagerStats() {
+  const stale = allClients.filter(isStale);
+  const won = allClients.filter(c => c.status === '已成交');
+  document.getElementById('managerStats').innerHTML = `
+    <div class="stat-card"><div class="stat-label">全部客戶</div><div class="stat-num accent">${allClients.length}</div></div>
+    <div class="stat-card"><div class="stat-label">未更新提醒</div><div class="stat-num ${stale.length > 0 ? 'danger' : ''}">${stale.length}</div></div>
+    <div class="stat-card"><div class="stat-label">已成交</div><div class="stat-num">${won.length}</div></div>
+    <div class="stat-card"><div class="stat-label">業務人數</div><div class="stat-num">${salesMembers.length}</div></div>
+  `;
+}
+
+function renderManagerTable() {
+  const search = document.getElementById('managerSearch')?.value.toLowerCase() || '';
+  const salesF = document.getElementById('managerSalesFilter')?.value || '';
+  const statusF = document.getElementById('managerStatusFilter')?.value || '';
+  const staleF = document.getElementById('managerStaleFilter')?.value || '';
+  let clients = [...allClients];
+  if (search) clients = clients.filter(c => c.name?.toLowerCase().includes(search));
+  if (salesF) clients = clients.filter(c => c.sales === salesF);
+  if (statusF) clients = clients.filter(c => c.status === statusF);
+  if (staleF === 'stale') clients = clients.filter(isStale);
+  clients.sort((a, b) => (isStale(b) ? 1 : 0) - (isStale(a) ? 1 : 0));
+  const tbody = document.getElementById('managerTableBody');
+  if (!clients.length) { tbody.innerHTML = '<tr><td colspan="8"><div class="empty"><div class="empty-icon">📋</div><p>沒有符合的記錄</p></div></td></tr>'; return; }
+  tbody.innerHTML = clients.map(c => {
+    const stale = isStale(c); const days = daysSince(c.updatedAt);
+    return `<tr class="${stale ? 'stale-row' : ''}">
+      <td><strong>${c.name}</strong>${stale ? `<span class="stale-badge">⚠ ${days}天</span>` : ''}</td>
+      <td>${c.sales}</td><td>${c.source || '—'}</td><td>${c.model || '—'}</td>
+      <td><span class="badge badge-${c.status}">${c.status}</span></td>
+      <td style="white-space:nowrap">${formatDate(c.updatedAt)}</td>
+      <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${c.note || ''}">${c.note || '—'}</td>
+      <td><div class="action-row">
+        <button class="icon-btn" onclick="openEditClient('${c.id}')">編輯</button>
+        <button class="icon-btn danger" onclick="deleteClient('${c.id}')">刪除</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderSalesOverview() {
+  document.getElementById('salesGrid').innerHTML = salesMembers.map(m => {
+    const mc = allClients.filter(c => c.sales === m);
+    const stale = mc.filter(isStale); const won = mc.filter(c => c.status === '已成交');
+    return `<div class="sales-card">
+      <div class="sales-card-header"><span class="sales-name">${m}</span></div>
+      <div class="sales-stats">
+        <div class="sales-stat"><div class="sales-stat-num">${mc.length}</div><div class="sales-stat-label">客戶總數</div></div>
+        <div class="sales-stat"><div class="sales-stat-num warn">${stale.length}</div><div class="sales-stat-label">未更新</div></div>
+        <div class="sales-stat"><div class="sales-stat-num">${won.length}</div><div class="sales-stat-label">已成交</div></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── System Settings ───────────────────────────────────────────────
+function renderSalesMemberList() {
+  document.getElementById('salesMemberList').innerHTML = salesMembers.map((m, i) => `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+      <span style="flex:1;font-size:13px">${m}</span>
+      <button class="icon-btn danger" onclick="removeSalesMember('${m}')">移除</button>
+    </div>`).join('');
+}
+
+async function addSalesMember() {
+  const name = document.getElementById('newSalesName').value.trim();
+  if (!name) return;
+  if (salesMembers.includes(name)) { showToast('名稱已存在', 'error'); return; }
+  showLoading('新增中...');
+  await apiPost({ action: 'saveSalesMember', name });
+  salesMembers = await apiGet('getSalesMembers');
+  hideLoading();
+  document.getElementById('newSalesName').value = '';
+  renderSalesMemberList(); populateManagerFilters(); populateLoginDropdown();
+  showToast(`已新增：${name}`);
+}
+
+async function removeSalesMember(name) {
+  if (!confirm(`確定要移除「${name}」？`)) return;
+  showLoading('移除中...');
+  await apiPost({ action: 'deleteSalesMember', name });
+  salesMembers = await apiGet('getSalesMembers');
+  hideLoading();
+  renderSalesMemberList(); populateManagerFilters();
+  showToast('已移除');
+}
+
+function saveManagerPw() {
+  const pw = document.getElementById('newManagerPw').value.trim();
+  if (!pw) { showToast('請輸入密碼', 'error'); return; }
+  setManagerPw(pw); document.getElementById('newManagerPw').value = '';
+  showToast('密碼已更新');
+}
+
+// ── Client CRUD ───────────────────────────────────────────────────
+function openAddClient() {
+  editingId = null;
+  document.getElementById('modalTitle').textContent = '新增客戶';
+  document.getElementById('fName').value = '';
+  document.getElementById('fSource').value = '';
+  document.getElementById('fModel').value = '';
+  document.getElementById('fStatus').value = '報價中';
+  document.getElementById('fNote').value = '';
+  document.getElementById('fUpdated').value = new Date().toISOString().slice(0, 16);
+  const sel = document.getElementById('fSales');
+  sel.innerHTML = salesMembers.map(m => `<option>${m}</option>`).join('');
+  if (currentRole === 'sales') sel.value = currentUser;
+  document.getElementById('clientModal').classList.add('open');
+}
+
+function openEditClient(id) {
+  const c = allClients.find(x => x.id === id);
+  if (!c) return;
+  editingId = id;
+  document.getElementById('modalTitle').textContent = '編輯客戶';
+  document.getElementById('fName').value = c.name;
+  document.getElementById('fSource').value = c.source || '';
+  document.getElementById('fModel').value = c.model || '';
+  document.getElementById('fStatus').value = c.status;
+  document.getElementById('fNote').value = c.note || '';
+  document.getElementById('fUpdated').value = c.updatedAt ? c.updatedAt.slice(0, 16) : new Date().toISOString().slice(0, 16);
+  const sel = document.getElementById('fSales');
+  sel.innerHTML = salesMembers.map(m => `<option>${m}</option>`).join('');
+  sel.value = c.sales;
+  document.getElementById('clientModal').classList.add('open');
+}
+
+function closeModal() { document.getElementById('clientModal').classList.remove('open'); }
+
+async function saveClient() {
+  const name = document.getElementById('fName').value.trim();
+  if (!name) { showToast('請填寫客戶名稱', 'error'); return; }
+  const client = {
+    id: editingId || uid(),
+    name,
+    sales: document.getElementById('fSales').value,
+    source: document.getElementById('fSource').value.trim(),
+    model: document.getElementById('fModel').value.trim(),
+    status: document.getElementById('fStatus').value,
+    note: document.getElementById('fNote').value.trim(),
+    updatedAt: new Date(document.getElementById('fUpdated').value).toISOString(),
+    createdAt: editingId ? allClients.find(c => c.id === editingId)?.createdAt : nowISO(),
+  };
+  showLoading('儲存中...');
+  await apiPost({ action: 'saveClient', client });
+  hideLoading();
+  closeModal();
+  showToast(editingId ? '已更新' : '客戶已新增');
+  await loadClients();
+  if (currentRole === 'sales') { renderSalesTable(); renderSalesStats(); populateUpdateSelect(); }
+  else { renderManagerTable(); renderManagerStats(); renderSalesOverview(); }
+}
+
+async function deleteClient(id) {
+  if (!confirm('確定刪除這筆客戶記錄？')) return;
+  showLoading('刪除中...');
+  await apiPost({ action: 'deleteClient', id });
+  hideLoading();
+  showToast('已刪除');
+  await loadClients();
+  if (currentRole === 'sales') { renderSalesTable(); renderSalesStats(); populateUpdateSelect(); }
+  else { renderManagerTable(); renderManagerStats(); renderSalesOverview(); }
+}
+
+// ── Init ──────────────────────────────────────────────────────────
+initLogin();
+</script>
+</body>
+</html>
