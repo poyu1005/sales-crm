@@ -307,10 +307,12 @@ async function apiGet(action) {
 }
 
 async function apiPost(data) {
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
+  const action = data.action;
+  let params = `action=${action}`;
+  if (data.client) params += `&client=${encodeURIComponent(JSON.stringify(data.client))}`;
+  if (data.id) params += `&id=${encodeURIComponent(data.id)}`;
+  if (data.name) params += `&name=${encodeURIComponent(data.name)}`;
+  const res = await fetch(`${API_URL}?${params}`);
   return res.json();
 }
 
