@@ -428,7 +428,9 @@ function isStale(c) {
 
 function isFollowUpToday(c) {
   if (!c.nextFollowUp) return false;
-  return c.nextFollowUp.slice(0, 10) === todayStr();
+  const today = new Date();
+  const todayLocal = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  return c.nextFollowUp.slice(0, 10) === todayLocal;
 }
 
 function isThisMonth(c) {
@@ -808,7 +810,7 @@ async function saveClient() {
     model: document.getElementById('fModel').value.trim(),
     status: document.getElementById('fStatus').value,
     note: document.getElementById('fNote').value.trim(),
-    nextFollowUp: document.getElementById('fFollowUp').value,
+    nextFollowUp: document.getElementById('fFollowUp').value || '',
     updatedAt: nowISO(),
     createdAt: editingId ? (allClients.find(c => c.id === editingId)?.createdAt || nowISO()) : nowISO(),
   };
