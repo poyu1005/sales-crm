@@ -1,34 +1,34 @@
 /**
- * LINE Bot 自動提醒腳本（使用 LINE Messaging API）
- * - 個人推播：發給每位業務自己的 LINE（需要各業務的 User ID）
- * - 群組推播：發給主管群組（需要群組的 Group ID）
+ * LINE Bot 自動提醒腳本
+ * 每天早上 9 點執行，發送兩種通知：
+ * 1. 超過 N 天未更新進度 → 提醒業務 + 主管日報
+ * 2. 今天需要跟進的客戶 → 提醒業務 + 主管日報
  *
- * 部署在 GitHub Actions，每天早上 9 點自動執行
- * 安裝：npm install node-fetch
+ * 資料來源：Google Apps Script API
  */
 
 const fetch = (...args) => import('node-fetch').then(({ default: f }) => f(...args));
 
-// ── 環境變數（填在 GitHub Secrets）────────────────────────────────
-const LINE_CHANNEL_TOKEN = process.env.LINE_CHANNEL_TOKEN; // LINE Bot Channel Access Token
-const LINE_GROUP_ID      = process.env.LINE_GROUP_ID;      // 主管群組的 Group ID
-const GIST_ID            = process.env.GIST_ID;
-const GIST_TOKEN         = process.env.GIST_TOKEN;
+// ── 環境變數 ──────────────────────────────────────────────────────
+const LINE_CHANNEL_TOKEN = process.env.LINE_CHANNEL_TOKEN;
+const LINE_GROUP_ID      = process.env.LINE_GROUP_ID;
+const APPS_SCRIPT_URL    = process.env.APPS_SCRIPT_URL;  // Google Apps Script 網址
+const SALES_USERIDS      = process.env.SALES_USERIDS;    // JSON 字串，業務姓名對應 User ID
 const STALE_DAYS         = parseInt(process.env.STALE_DAYS || '1');
 
-// ── 從 GitHub Gist 讀取資料 ───────────────────────────────────────
-async function fetchGist() {
-  const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
-    headers: {
-      Authorization: `Bearer ${GIST_TOKEN}`,
-      Accept: 'application/vnd.github+json',
-    }
-  });
-  if (!res.ok) throw new Error(`Gist 讀取失敗: ${res.status}`);
+// ── 從 Google Apps Script 讀取客戶資料 ───────────────────────────
+async function fetchClients() {
+  const res = await fetch(`${APPS_SCRIPT_URL}?action=getClients`);
+  if (!res.ok) throw new Error(`讀取失敗: ${res.status}`);
   const data = await res.json();
-  const clients = JSON.parse(data.files['clients.json']?.content || '[]');
-  const userIds  = JSON.parse(data.files['sales_userids.json']?.content || '{}');
-  return { clients, userIds };
+  return Array.isArray(data) ? data : [];
+}
+
+// ── 今天的日期字串（台灣時間）────────────────────────────────────
+function todayTW() {
+  const now = new Date();
+  const tw = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+  return tw.toISOString().slice(0, 10);
 }
 
 // ── 判斷是否未更新 ────────────────────────────────────────────────
@@ -38,12 +38,29 @@ function isStale(c) {
   return (Date.now() - new Date(c.updatedAt).getTime()) / 86400000 >= STALE_DAYS;
 }
 
+// ── 判斷今天是否需要跟進 ─────────────────────────────────────────
+function isFollowUpToday(c) {
+  if (!c.nextFollowUp) return false;
+  if (['已成交', '未成交'].includes(c.status)) return false;
+  return c.nextFollowUp.slice(0, 10) === todayTW();
+}
+
 function daysSince(d) {
   if (!d) return '?';
   return Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
 }
 
-// ── 發送 LINE Push Message（個人或群組）──────────────────────────
+// ── 依業務分組 ────────────────────────────────────────────────────
+function groupBy(clients) {
+  const grouped = {};
+  clients.forEach(c => {
+    if (!grouped[c.sales]) grouped[c.sales] = [];
+    grouped[c.sales].push(c);
+  });
+  return grouped;
+}
+
+// ── 發送 LINE Push Message ────────────────────────────────────────
 async function pushLine(to, messages) {
   const res = await fetch('https://api.line.me/v2/bot/message/push', {
     method: 'POST',
@@ -61,71 +78,82 @@ async function pushLine(to, messages) {
   return true;
 }
 
-// ── 組合業務個人訊息 ──────────────────────────────────────────────
-function buildSalesMessage(salesName, records) {
-  const lines = records.map((c, i) =>
-    `${i + 1}. ${c.name}\n   狀態：${c.status}｜已 ${daysSince(c.updatedAt)} 天未更新`
-  ).join('\n\n');
-
-  return [{
-    type: 'text',
-    text: `📋 進度提醒\n\n${salesName}，以下客戶超過 ${STALE_DAYS} 天未更新，請盡快處理：\n\n${lines}\n\n請登入系統更新進度 🙏`,
-  }];
-}
-
-// ── 組合主管群組彙整訊息 ──────────────────────────────────────────
-function buildManagerMessage(grouped, total) {
-  const today = new Date().toLocaleDateString('zh-TW');
-  let text = `📊 主管日報 ${today}\n共 ${total} 筆客戶超過 ${STALE_DAYS} 天未更新：\n`;
-
-  for (const [sales, records] of Object.entries(grouped)) {
-    text += `\n👤 ${sales}（${records.length} 筆）\n`;
-    records.forEach(c => {
-      text += `  • ${c.name}｜${c.status}｜${daysSince(c.updatedAt)} 天未更新\n`;
-    });
-  }
-
-  return [{ type: 'text', text }];
-}
-
 // ── 主程式 ────────────────────────────────────────────────────────
 async function main() {
-  console.log(`🚀 開始執行 LINE Bot 通知（超過 ${STALE_DAYS} 天未更新）`);
+  const today = todayTW();
+  console.log(`🚀 開始執行 LINE Bot 通知 (${today})`);
 
-  const { clients, userIds } = await fetchGist();
-  const stale = clients.filter(isStale);
+  // 讀取業務 User ID
+  let userIds = {};
+  try { userIds = JSON.parse(SALES_USERIDS || '{}'); } catch(e) { userIds = {}; }
 
-  console.log(`📊 共 ${clients.length} 筆，其中 ${stale.length} 筆需要提醒`);
+  // 讀取客戶資料
+  const clients = await fetchClients();
+  console.log(`📊 共讀取 ${clients.length} 筆客戶資料`);
 
-  if (stale.length === 0) {
-    console.log('✅ 所有進度都是最新的，不需要發通知');
-    return;
-  }
+  // 分類
+  const staleClients   = clients.filter(isStale);
+  const followupClients = clients.filter(isFollowUpToday);
 
-  // 依業務分組
-  const grouped = {};
-  stale.forEach(c => {
-    if (!grouped[c.sales]) grouped[c.sales] = [];
-    grouped[c.sales].push(c);
-  });
+  console.log(`⚠  超過 ${STALE_DAYS} 天未更新：${staleClients.length} 筆`);
+  console.log(`📅 今日需跟進：${followupClients.length} 筆`);
 
-  // 個人推播給各業務
-  for (const [sales, records] of Object.entries(grouped)) {
-    const userId = userIds[sales];
-    if (!userId) {
-      console.warn(`⚠  ${sales} 沒有 User ID，略過個人通知`);
-      continue;
+  // ── 1. 未更新通知 ────────────────────────────────────────────────
+  if (staleClients.length > 0) {
+    const grouped = groupBy(staleClients);
+
+    // 個人通知
+    for (const [sales, records] of Object.entries(grouped)) {
+      const userId = userIds[sales];
+      if (!userId) { console.warn(`⚠  ${sales} 沒有 User ID，略過`); continue; }
+      const text = `📋 進度提醒\n\n${sales}，以下客戶超過 ${STALE_DAYS} 天未更新：\n\n` +
+        records.map((c, i) => `${i+1}. ${c.name}\n   狀態：${c.status}｜${daysSince(c.updatedAt)}天未更新`).join('\n\n') +
+        '\n\n請登入系統更新進度 🙏';
+      const ok = await pushLine(userId, [{ type: 'text', text }]);
+      console.log(ok ? `📱 已通知業務：${sales}（${records.length} 筆未更新）` : `❌ 通知失敗：${sales}`);
     }
-    const ok = await pushLine(userId, buildSalesMessage(sales, records));
-    console.log(ok ? `📱 已通知業務：${sales}（${records.length} 筆）` : `❌ 通知失敗：${sales}`);
+
+    // 主管群組
+    if (LINE_GROUP_ID) {
+      let text = `📊 主管日報 ${today}\n未更新共 ${staleClients.length} 筆：\n`;
+      for (const [sales, records] of Object.entries(grouped)) {
+        text += `\n👤 ${sales}（${records.length} 筆）\n`;
+        records.forEach(c => text += `  • ${c.name}｜${c.status}｜${daysSince(c.updatedAt)}天\n`);
+      }
+      const ok = await pushLine(LINE_GROUP_ID, [{ type: 'text', text }]);
+      console.log(ok ? '📊 已發送主管日報（未更新）' : '❌ 主管群組推播失敗');
+    }
   }
 
-  // 推播到主管群組
-  if (LINE_GROUP_ID) {
-    const ok = await pushLine(LINE_GROUP_ID, buildManagerMessage(grouped, stale.length));
-    console.log(ok ? '📊 已發送主管群組日報' : '❌ 主管群組推播失敗');
-  } else {
-    console.warn('⚠  未設定 LINE_GROUP_ID，略過群組通知');
+  // ── 2. 今日跟進通知 ──────────────────────────────────────────────
+  if (followupClients.length > 0) {
+    const grouped = groupBy(followupClients);
+
+    // 個人通知
+    for (const [sales, records] of Object.entries(grouped)) {
+      const userId = userIds[sales];
+      if (!userId) { console.warn(`⚠  ${sales} 沒有 User ID，略過跟進通知`); continue; }
+      const text = `📅 今日跟進提醒\n\n${sales}，以下客戶今天需要聯絡：\n\n` +
+        records.map((c, i) => `${i+1}. ${c.name}\n   狀態：${c.status}`).join('\n\n') +
+        '\n\n加油！今天聯絡到 💪';
+      const ok = await pushLine(userId, [{ type: 'text', text }]);
+      console.log(ok ? `📅 已通知業務：${sales}（${records.length} 筆今日跟進）` : `❌ 跟進通知失敗：${sales}`);
+    }
+
+    // 主管群組
+    if (LINE_GROUP_ID) {
+      let text = `📅 今日跟進日報 ${today}\n共 ${followupClients.length} 筆需跟進：\n`;
+      for (const [sales, records] of Object.entries(grouped)) {
+        text += `\n👤 ${sales}（${records.length} 筆）\n`;
+        records.forEach(c => text += `  • ${c.name}｜${c.status}\n`);
+      }
+      const ok = await pushLine(LINE_GROUP_ID, [{ type: 'text', text }]);
+      console.log(ok ? '📅 已發送主管今日跟進日報' : '❌ 主管群組跟進推播失敗');
+    }
+  }
+
+  if (staleClients.length === 0 && followupClients.length === 0) {
+    console.log('✅ 今天沒有需要提醒的項目！');
   }
 
   console.log('✅ 完成！');
