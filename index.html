@@ -342,9 +342,6 @@
         </div>
         <div class="field"><label>下次跟進日期</label><input type="date" id="fFollowUp"></div>
       </div>
-      <div class="form-row">
-        <div class="field"><label>最後更新時間</label><input type="datetime-local" id="fUpdated"></div>
-      </div>
       <div class="field"><label>備註</label><textarea id="fNote" placeholder="目前進展、下次跟進重點..."></textarea></div>
     </div>
     <div class="modal-footer">
@@ -775,7 +772,6 @@ function openAddClient() {
   document.getElementById('fStatus').value = '報價中';
   document.getElementById('fNote').value = '';
   document.getElementById('fFollowUp').value = '';
-  document.getElementById('fUpdated').value = new Date().toISOString().slice(0, 16);
   const sel = document.getElementById('fSales');
   sel.innerHTML = salesMembers.map(m => `<option>${m}</option>`).join('');
   if (currentRole === 'sales') sel.value = currentUser;
@@ -793,7 +789,6 @@ function openEditClient(id) {
   document.getElementById('fStatus').value = c.status;
   document.getElementById('fNote').value = c.note || '';
   document.getElementById('fFollowUp').value = c.nextFollowUp ? c.nextFollowUp.slice(0,10) : '';
-  document.getElementById('fUpdated').value = c.updatedAt ? c.updatedAt.slice(0, 16) : new Date().toISOString().slice(0, 16);
   const sel = document.getElementById('fSales');
   sel.innerHTML = salesMembers.map(m => `<option>${m}</option>`).join('');
   sel.value = c.sales;
@@ -814,7 +809,7 @@ async function saveClient() {
     status: document.getElementById('fStatus').value,
     note: document.getElementById('fNote').value.trim(),
     nextFollowUp: document.getElementById('fFollowUp').value,
-    updatedAt: new Date(document.getElementById('fUpdated').value).toISOString(),
+    updatedAt: nowISO(),
     createdAt: editingId ? (allClients.find(c => c.id === editingId)?.createdAt || nowISO()) : nowISO(),
   };
   showLoading('儲存中...');
