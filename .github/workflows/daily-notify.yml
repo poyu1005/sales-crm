@@ -2,8 +2,8 @@ name: 每日客戶進度提醒
 
 on:
   schedule:
-    - cron: "0 1 * * 1-5"
-  workflow_dispatch:
+    - cron: "0 1 * * 1-5"   # 週一到週五早上 9:00 台灣時間（UTC+8 = UTC 01:00）
+  workflow_dispatch:          # 可手動觸發測試
 
 jobs:
   notify:
@@ -18,7 +18,7 @@ jobs:
         env:
           LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
           LINE_GROUP_ID:      ${{ secrets.LINE_GROUP_ID }}
-          GIST_ID:            ${{ secrets.GIST_ID }}
-          GIST_TOKEN:         ${{ secrets.GIST_TOKEN }}
+          APPS_SCRIPT_URL:    ${{ secrets.APPS_SCRIPT_URL }}
+          SALES_USERIDS:      ${{ secrets.SALES_USERIDS }}
           STALE_DAYS:         "1"
         run: node notify.js
