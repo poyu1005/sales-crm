@@ -2,8 +2,8 @@ name: 每日客戶進度提醒
 
 on:
   schedule:
-- cron: "30 0 * * 1-5"   # 週一到週五早上 8:30 台灣時間   
-  workflow_dispatch:          # 可手動觸發測試
+    - cron: "30 0 * * 1-5"
+  workflow_dispatch:
 
 jobs:
   notify:
