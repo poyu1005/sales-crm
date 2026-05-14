@@ -631,7 +631,7 @@ async function submitUpdate() {
     ...c,
     status: document.getElementById('updateStatus').value,
     model: document.getElementById('updateModel').value,
-    nextFollowUp: document.getElementById('updateFollowUp').value,
+    nextFollowUp: document.getElementById('updateFollowUp').value ? document.getElementById('updateFollowUp').value + 'T12:00:00' : '',
     note: document.getElementById('updateNote').value || c.note,
     updatedAt: nowISO(),
   };
@@ -810,7 +810,7 @@ async function saveClient() {
     model: document.getElementById('fModel').value.trim(),
     status: document.getElementById('fStatus').value,
     note: document.getElementById('fNote').value.trim(),
-    nextFollowUp: document.getElementById('fFollowUp').value || '',
+    nextFollowUp: document.getElementById('fFollowUp').value ? document.getElementById('fFollowUp').value + 'T12:00:00' : '',
     updatedAt: nowISO(),
     createdAt: editingId ? (allClients.find(c => c.id === editingId)?.createdAt || nowISO()) : nowISO(),
   };
