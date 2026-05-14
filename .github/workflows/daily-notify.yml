@@ -1,8 +1,6 @@
 name: 每日客戶進度提醒
 
 on:
-  schedule:
-    - cron: "30 0 * * 1-5"
   workflow_dispatch:
 
 jobs:
